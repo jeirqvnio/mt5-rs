@@ -1,0 +1,35 @@
+[package]
+name = "mt5"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+license = "MIT"
+repository = "https://github.com/jeirqvnio/mt5-rs"
+description = "MetaTrader 5 client speaking the terminal's own IPC. No Python."
+keywords = ["metatrader", "mt5", "trading", "ipc"]
+categories = ["api-bindings", "finance"]
+
+[dependencies]
+tokio = { version = "1", default-features = false, features = ["net", "io-util", "time", "sync", "rt"] }
+sha2 = "0.10"
+thiserror = "2"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+
+[features]
+# The Windows-side binary that forwards TCP to the terminal's pipe.
+relay = ["tokio/rt-multi-thread", "tokio/macros"]
+
+[[bin]]
+name = "mt5-relay"
+required-features = ["relay"]
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
