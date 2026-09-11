@@ -2,7 +2,7 @@
 //! trade, then place, move and remove a pending order far from the market.
 //! Same environment as `login`; `MT5_SYMBOLS` is a comma list to try.
 
-use mt5::{order_type, retcode, Config, Mt5, TradeRequest};
+use mt5::{Config, Mt5, OrderType, SymbolTradeMode, TradeRequest};
 
 #[tokio::main]
 async fn main() -> mt5::Result<()> {
@@ -18,13 +18,13 @@ async fn main() -> mt5::Result<()> {
         a.login, a.server, ti.trade_allowed, a.trade_allowed
     );
 
-    // SYMBOL_TRADE_MODE_FULL is 4; a symbol outside Market Watch must be
-    // selected before symbol_info answers for it.
+    // A symbol outside Market Watch must be selected before symbol_info
+    // answers for it.
     let tradeable: Vec<String> = mt5
         .symbols(None)
         .await?
         .into_iter()
-        .filter(|s| s.trade_mode == 4 && s.bid > 0.0)
+        .filter(|s| s.trade_mode == SymbolTradeMode::Full && s.bid > 0.0)
         .map(|s| s.name)
         .collect();
     println!(
@@ -51,7 +51,7 @@ async fn main() -> mt5::Result<()> {
             "{sym}: trade_mode {} exemode {} filling {} stops_level {} bid {}",
             s.trade_mode, s.trade_exemode, s.filling_mode, s.trade_stops_level, t.bid
         );
-        let mut market = TradeRequest::market(sym, order_type::BUY, s.volume_min, t.ask)
+        let mut market = TradeRequest::market(sym, OrderType::Buy, s.volume_min, t.ask)
             .deviation(20)
             .magic(7);
         if let Some(m) = s.preferred_filling() {
@@ -59,27 +59,20 @@ async fn main() -> mt5::Result<()> {
         }
         let c = mt5.order_check(&market).await?;
         println!(
-            "  order_check {} {} margin {} free {} {:?}",
-            c.retcode,
-            retcode::name(c.retcode),
-            c.margin,
-            c.margin_free,
-            c.comment
+            "  order_check {} margin {} free {} {:?}",
+            c.retcode, c.margin, c.margin_free, c.comment
         );
         if !c.is_ok() {
             continue;
         }
         let resting = s.normalize_price(t.bid * 0.9);
-        let pending = TradeRequest::pending(sym, order_type::BUY_LIMIT, s.volume_min, resting)
+        let pending = TradeRequest::pending(sym, OrderType::BuyLimit, s.volume_min, resting)
             .magic(7)
             .comment("mt5-rs probe");
         let sent = mt5.order_send(&pending).await?;
         println!(
-            "  order_send  {} {} order {} {:?}",
-            sent.retcode,
-            retcode::name(sent.retcode),
-            sent.order,
-            sent.comment
+            "  order_send  {} order {} {:?}",
+            sent.retcode, sent.order, sent.comment
         );
         if !sent.is_success() {
             continue;
@@ -94,22 +87,14 @@ async fn main() -> mt5::Result<()> {
             let moved = mt5
                 .order_send(&TradeRequest::modify(o, s.normalize_price(resting * 0.99)))
                 .await?;
-            println!(
-                "  modify      {} {}",
-                moved.retcode,
-                retcode::name(moved.retcode)
-            );
+            println!("  modify      {}", moved.retcode);
             println!(
                 "  price now   {:?}",
                 mt5.order(o.ticket).await?.map(|o| o.price_open)
             );
         }
         let gone = mt5.order_send(&TradeRequest::remove(sent.order)).await?;
-        println!(
-            "  remove      {} {}",
-            gone.retcode,
-            retcode::name(gone.retcode)
-        );
+        println!("  remove      {}", gone.retcode);
         println!("  orders now  {}", mt5.orders_total().await?);
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
         println!(

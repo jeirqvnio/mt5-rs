@@ -8,13 +8,10 @@
 
 use std::time::Duration;
 
-use mt5::{order_type, retcode, AccountInfo, Config, Mt5, SymbolInfo, TradeRequest};
-
-/// `ENUM_ACCOUNT_TRADE_MODE`: 0 demo, 1 contest, 2 real.
-const ACCOUNT_REAL: i32 = 2;
-
-/// `SYMBOL_TRADE_MODE_FULL`: the broker accepts orders, not just quotes.
-const TRADE_MODE_FULL: i32 = 4;
+use mt5::{
+    AccountInfo, AccountTradeMode, Config, Mt5, OrderType, SymbolInfo, SymbolTradeMode,
+    TradeRequest,
+};
 
 /// Stamped on both legs so the deals can be told from anything else on the
 /// account.
@@ -44,7 +41,7 @@ async fn main() -> mt5::Result<()> {
         "account {} on {} — {} {}, trade_mode {}",
         account.login, account.server, account.balance, account.currency, account.trade_mode
     );
-    if account.trade_mode == ACCOUNT_REAL {
+    if account.trade_mode == AccountTradeMode::Real {
         println!("REAL account: refusing to send a market order from an example.");
         return Ok(());
     }
@@ -73,13 +70,11 @@ async fn main() -> mt5::Result<()> {
     );
 
     // Ask first. A rejection here costs nothing and names the reason.
-    let entry = market(&symbol, order_type::BUY, lot, tick.ask);
+    let entry = market(&symbol, OrderType::Buy, lot, tick.ask);
     let check = mt5.order_check(&entry).await?;
     println!(
         "order_check  {} — margin {} of {} free",
-        retcode::name(check.retcode),
-        check.margin,
-        check.margin_free
+        check.retcode, check.margin, check.margin_free
     );
     if !check.is_ok() {
         println!("not sending: {}", check.comment);
@@ -89,11 +84,7 @@ async fn main() -> mt5::Result<()> {
     let opened = mt5.order_send(&entry).await?;
     println!(
         "order_send   {} — deal {} order {} volume {} at {}",
-        retcode::name(opened.retcode),
-        opened.deal,
-        opened.order,
-        opened.volume,
-        opened.price
+        opened.retcode, opened.deal, opened.order, opened.volume, opened.price
     );
     if !opened.is_success() {
         println!("nothing opened: {}", opened.comment);
@@ -132,11 +123,7 @@ async fn main() -> mt5::Result<()> {
     let protected = mt5
         .order_send(&TradeRequest::protect(&position).sl(stop))
         .await?;
-    println!(
-        "protect      {} — stop asked {}",
-        retcode::name(protected.retcode),
-        stop
-    );
+    println!("protect      {} — stop asked {}", protected.retcode, stop);
     if protected.is_success() {
         let now = mt5
             .position(position.ticket)
@@ -154,10 +141,7 @@ async fn main() -> mt5::Result<()> {
     let closed = mt5.order_send(&exit).await?;
     println!(
         "close        {} — deal {} volume {} at {}",
-        retcode::name(closed.retcode),
-        closed.deal,
-        closed.volume,
-        closed.price
+        closed.retcode, closed.deal, closed.volume, closed.price
     );
 
     tokio::time::sleep(SETTLE).await;
@@ -192,7 +176,7 @@ async fn main() -> mt5::Result<()> {
 }
 
 /// Build a market order the contract will accept.
-fn market(symbol: &SymbolInfo, side: u32, lot: f64, price: f64) -> TradeRequest {
+fn market(symbol: &SymbolInfo, side: OrderType, lot: f64, price: f64) -> TradeRequest {
     let mut request = TradeRequest::market(&symbol.name, side, lot, price)
         .deviation(20)
         .magic(MAGIC)
@@ -217,7 +201,10 @@ async fn cheapest_round_trip(mt5: &Mt5, account: &AccountInfo) -> mt5::Result<Op
     let server_now = all.iter().map(|s| s.time).max().unwrap_or(0);
     let mut best: Option<(f64, SymbolInfo)> = None;
     for symbol in all {
-        if symbol.trade_mode != TRADE_MODE_FULL || symbol.bid <= 0.0 || symbol.ask <= symbol.bid {
+        if symbol.trade_mode != SymbolTradeMode::Full
+            || symbol.bid <= 0.0
+            || symbol.ask <= symbol.bid
+        {
             continue;
         }
         if server_now - symbol.time > STALE_QUOTE {

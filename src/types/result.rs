@@ -1,12 +1,11 @@
 //! What the server answers a trade request with.
 
-use crate::types::retcode;
+use crate::types::RetCode;
 
 /// `MqlTradeResult`.
 #[derive(Debug, Clone, Default)]
 pub struct TradeResult {
-    /// [`retcode`].
-    pub retcode: u32,
+    pub retcode: RetCode,
     pub deal: u64,
     pub order: u64,
     pub volume: f64,
@@ -20,15 +19,15 @@ pub struct TradeResult {
 
 impl TradeResult {
     /// Whether the server took the order: placed, done, or partially done.
-    pub fn is_success(&self) -> bool {
-        retcode::is_success(self.retcode)
+    pub const fn is_success(&self) -> bool {
+        self.retcode.is_success()
     }
 }
 
 /// `MqlTradeCheckResult`. Success is retcode **0** here, not `DONE`.
 #[derive(Debug, Clone, Default)]
 pub struct TradeCheckResult {
-    pub retcode: u32,
+    pub retcode: RetCode,
     pub balance: f64,
     pub equity: f64,
     pub profit: f64,
@@ -41,7 +40,7 @@ pub struct TradeCheckResult {
 impl TradeCheckResult {
     /// Whether the server found the request valid. `order_check` reports
     /// success as retcode 0, not `DONE`, which is why this exists.
-    pub fn is_ok(&self) -> bool {
-        self.retcode == 0
+    pub const fn is_ok(&self) -> bool {
+        matches!(self.retcode, RetCode::Ok)
     }
 }

@@ -14,7 +14,7 @@ const CHECK_RESULT_BYTES: usize = 252;
 
 pub fn trade_request(r: &TradeRequest) -> Result<Vec<u8>> {
     let body = Writer::new()
-        .u32(r.action)
+        .i32(r.action.code())
         .u64(r.magic)
         .u64(r.order)
         .fixed_string(&r.symbol, SLOT_SYMBOL)
@@ -24,9 +24,9 @@ pub fn trade_request(r: &TradeRequest) -> Result<Vec<u8>> {
         .f64(r.sl)
         .f64(r.tp)
         .u64(r.deviation)
-        .u32(r.order_type)
-        .u32(r.type_filling)
-        .u32(r.type_time)
+        .i32(r.order_type.code())
+        .i32(r.type_filling.code())
+        .i32(r.type_time.code())
         .i64(r.expiration)
         .fixed_string(&r.comment, SLOT_COMMENT)
         .u64(r.position)
@@ -50,7 +50,7 @@ pub fn trade_result(buf: &[u8]) -> Result<TradeResult> {
     }
     let mut c = Cursor::new(buf);
     fields!(c, "result", {
-        retcode: u32, deal: u64, order: u64, volume: f64, price: f64, bid: f64, ask: f64,
+        retcode: enum_u32, deal: u64, order: u64, volume: f64, price: f64, bid: f64, ask: f64,
         comment: fixed_string(RESULT_COMMENT_SLOT), request_id: u32, retcode_external: i32,
     });
     Ok(TradeResult {
@@ -76,7 +76,7 @@ pub fn check_result(buf: &[u8]) -> Result<TradeCheckResult> {
     }
     let mut c = Cursor::new(buf);
     fields!(c, "check", {
-        retcode: u32, balance: f64, equity: f64, profit: f64, margin: f64, margin_free: f64,
+        retcode: enum_u32, balance: f64, equity: f64, profit: f64, margin: f64, margin_free: f64,
         margin_level: f64, comment: fixed_string(RESULT_COMMENT_SLOT),
     });
     Ok(TradeCheckResult {
@@ -95,18 +95,18 @@ pub fn check_result(buf: &[u8]) -> Result<TradeCheckResult> {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
-    use crate::types::{order_type, trade_action};
+    use crate::types::{OrderType, TradeAction};
 
     #[test]
     fn the_request_is_232_bytes_with_fields_where_the_terminal_expects_them() {
-        let r = TradeRequest::market("EURUSD", order_type::BUY, 0.1, 1.2345)
+        let r = TradeRequest::market("EURUSD", OrderType::Buy, 0.1, 1.2345)
             .magic(777)
             .deviation(20)
             .comment(&"x".repeat(500));
         let body = trade_request(&r).unwrap();
         assert_eq!(body.len(), REQUEST_BYTES);
         let mut c = Cursor::new(&body);
-        assert_eq!(c.u32("action").unwrap(), trade_action::DEAL);
+        assert_eq!(c.i32("action").unwrap(), TradeAction::Deal.code());
         assert_eq!(c.u64("magic").unwrap(), 777);
         c.skip(8, "order").unwrap();
         assert_eq!(c.fixed_string(64, "symbol").unwrap(), "EURUSD");
@@ -114,7 +114,7 @@ mod tests {
         assert_eq!(c.f64("price").unwrap(), 1.2345);
         c.skip(24, "stoplimit sl tp").unwrap();
         assert_eq!(c.u64("deviation").unwrap(), 20);
-        assert_eq!(c.u32("type").unwrap(), order_type::BUY);
+        assert_eq!(c.i32("type").unwrap(), OrderType::Buy.code());
     }
 
     #[test]

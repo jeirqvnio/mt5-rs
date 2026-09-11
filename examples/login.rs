@@ -3,7 +3,7 @@
 //! Demo accounts only: a pending order is placed far from the market and
 //! removed again.
 
-use mt5::{order_type, retcode, Config, Mt5, TradeRequest};
+use mt5::{Config, Mt5, OrderType, TradeRequest};
 
 #[tokio::main]
 async fn main() -> mt5::Result<()> {
@@ -54,15 +54,15 @@ async fn main() -> mt5::Result<()> {
     let t = mt5.symbol_tick(&sym).await?;
     println!(
         "calc_margin  {:?}",
-        mt5.calc_margin(order_type::BUY, &sym, 1.0, t.ask).await
+        mt5.calc_margin(OrderType::Buy, &sym, 1.0, t.ask).await
     );
     println!(
         "calc_profit  {:?}",
-        mt5.calc_profit(order_type::BUY, &sym, 1.0, t.ask, t.ask + 0.001)
+        mt5.calc_profit(OrderType::Buy, &sym, 1.0, t.ask, t.ask + 0.001)
             .await
     );
 
-    let mut market = TradeRequest::market(&sym, order_type::BUY, s.volume_min, t.ask)
+    let mut market = TradeRequest::market(&sym, OrderType::Buy, s.volume_min, t.ask)
         .deviation(20)
         .magic(7);
     if let Some(m) = s.preferred_filling() {
@@ -71,25 +71,18 @@ async fn main() -> mt5::Result<()> {
     let c = mt5.order_check(&market).await?;
     println!(
         "order_check  {} {} margin {} free {} {:?}",
-        c.retcode,
-        retcode::name(c.retcode),
-        c.margin,
-        c.margin_free,
-        c.comment
+        c.retcode, c.retcode, c.margin, c.margin_free, c.comment
     );
 
     // A buy limit 10% below the market cannot fill; it exercises order_send.
     let resting = s.normalize_price(t.bid * 0.9);
-    let pending = TradeRequest::pending(&sym, order_type::BUY_LIMIT, s.volume_min, resting)
+    let pending = TradeRequest::pending(&sym, OrderType::BuyLimit, s.volume_min, resting)
         .magic(7)
         .comment("mt5-rs probe");
     let sent = mt5.order_send(&pending).await?;
     println!(
         "order_send   {} {} order {} {:?}",
-        sent.retcode,
-        retcode::name(sent.retcode),
-        sent.order,
-        sent.comment
+        sent.retcode, sent.retcode, sent.order, sent.comment
     );
     if sent.is_success() {
         let mine = mt5.order(sent.order).await?;
@@ -102,18 +95,10 @@ async fn main() -> mt5::Result<()> {
             let moved = mt5
                 .order_send(&TradeRequest::modify(&o, s.normalize_price(resting * 0.99)))
                 .await?;
-            println!(
-                "modify       {} {}",
-                moved.retcode,
-                retcode::name(moved.retcode)
-            );
+            println!("modify       {} {}", moved.retcode, moved.retcode);
         }
         let gone = mt5.order_send(&TradeRequest::remove(sent.order)).await?;
-        println!(
-            "remove       {} {}",
-            gone.retcode,
-            retcode::name(gone.retcode)
-        );
+        println!("remove       {} {}", gone.retcode, gone.retcode);
         println!("orders now   {}", mt5.orders_total().await?);
         let now = t.time;
         println!(

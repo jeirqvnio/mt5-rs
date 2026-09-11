@@ -3,7 +3,7 @@
 use crate::client::{commands, Mt5};
 use crate::codec;
 use crate::error::Result;
-use crate::types::{TradeCheckResult, TradeRequest, TradeResult};
+use crate::types::{OrderType, TradeCheckResult, TradeRequest, TradeResult};
 use crate::wire::{Cursor, Writer};
 
 impl Mt5 {
@@ -11,13 +11,13 @@ impl Mt5 {
     /// `margin` an `order_check` for the same request reports.
     pub async fn calc_margin(
         &self,
-        order_type: u32,
+        order_type: OrderType,
         symbol: &str,
         volume: f64,
         price: f64,
     ) -> Result<f64> {
         let body = Writer::new()
-            .u32(order_type)
+            .i32(order_type.code())
             .string(symbol)
             .f64(volume)
             .f64(price)
@@ -33,14 +33,14 @@ impl Mt5 {
     /// Profit of `volume` between two prices, in account currency.
     pub async fn calc_profit(
         &self,
-        order_type: u32,
+        order_type: OrderType,
         symbol: &str,
         volume: f64,
         open: f64,
         close: f64,
     ) -> Result<f64> {
         let body = Writer::new()
-            .u32(order_type)
+            .i32(order_type.code())
             .string(symbol)
             .f64(volume)
             .f64(open)

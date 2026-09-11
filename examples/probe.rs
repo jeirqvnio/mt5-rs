@@ -4,7 +4,7 @@
 
 use std::fmt::Debug;
 
-use mt5::{copy_ticks, order_type, Config, Mt5, Timeframe, TradeRequest};
+use mt5::{copy_ticks, Config, Mt5, OrderType, Timeframe, TradeRequest};
 
 fn report<T: Debug>(name: &str, r: mt5::Result<T>) {
     match r {
@@ -201,7 +201,7 @@ async fn main() -> mt5::Result<()> {
 
     if let Ok(t) = &tick {
         let s = mt5.symbol_info(&sym).await?;
-        let mut r = TradeRequest::market(&sym, order_type::BUY, s.volume_min, t.ask)
+        let mut r = TradeRequest::market(&sym, OrderType::Buy, s.volume_min, t.ask)
             .deviation(20)
             .magic(7);
         if let Some(m) = s.preferred_filling() {
@@ -209,17 +209,15 @@ async fn main() -> mt5::Result<()> {
         }
         report(
             "order_check",
-            mt5.order_check(&r)
-                .await
-                .map(|c| (c.retcode, mt5::retcode::name(c.retcode), c.comment)),
+            mt5.order_check(&r).await.map(|c| (c.retcode, c.comment)),
         );
         report(
             "calc_margin",
-            mt5.calc_margin(order_type::BUY, &sym, 1.0, t.ask).await,
+            mt5.calc_margin(OrderType::Buy, &sym, 1.0, t.ask).await,
         );
         report(
             "calc_profit",
-            mt5.calc_profit(order_type::BUY, &sym, 1.0, t.ask, t.ask + 0.001)
+            mt5.calc_profit(OrderType::Buy, &sym, 1.0, t.ask, t.ask + 0.001)
                 .await,
         );
     }

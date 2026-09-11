@@ -12,7 +12,7 @@ fn symbol(c: &mut Cursor) -> Result<SymbolInfo> {
     fields!(c, "symbol", {
         custom: bool, _chart_mode: skip(4), select: bool, visible: bool,
         _session_counters: skip(24), _volumes: skip(24), time: i64, digits: i32, spread: i32,
-        spread_float: bool, ticks_bookdepth: i32, trade_calc_mode: i32, trade_mode: i32,
+        spread_float: bool, ticks_bookdepth: i32, trade_calc_mode: i32, trade_mode: enum_i32,
         start_time: i64, expiration_time: i64, trade_stops_level: i32, trade_freeze_level: i32,
         trade_exemode: i32, swap_mode: i32, swap_rollover3days: i32, _margin_hedged_use_leg: skip(1),
         expiration_mode: i32, filling_mode: i32, order_mode: i32, order_gtc_mode: i32,

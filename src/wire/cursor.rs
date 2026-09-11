@@ -74,6 +74,18 @@ impl<'a> Cursor<'a> {
         Ok(f64::from_le_bytes(self.array(field)?))
     }
 
+    /// A four-byte MQL5 enumeration, read straight into its Rust type. An
+    /// unlisted value becomes that type's `Unknown` rather than an error: a
+    /// newer terminal adding one is not a broken record.
+    pub fn enum_i32<T: From<i32>>(&mut self, field: &'static str) -> Result<T> {
+        Ok(T::from(self.i32(field)?))
+    }
+
+    /// The same for the handful the protocol carries unsigned.
+    pub fn enum_u32<T: From<u32>>(&mut self, field: &'static str) -> Result<T> {
+        Ok(T::from(self.u32(field)?))
+    }
+
     /// Consume `bytes` without keeping them; skipping is what keeps the
     /// fields after them aligned.
     pub fn skip(&mut self, bytes: usize, field: &'static str) -> Result<()> {

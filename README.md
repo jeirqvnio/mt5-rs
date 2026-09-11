@@ -16,7 +16,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 ## Usage
 
 ```rust
-use mt5::{order_type, Mt5, TradeRequest};
+use mt5::{Mt5, OrderType, TradeRequest};
 
 #[tokio::main]
 async fn main() -> mt5::Result<()> {
@@ -25,11 +25,11 @@ async fn main() -> mt5::Result<()> {
     let tick = mt5.symbol_tick("EURUSD").await?;
     println!("{} / {}", tick.bid, tick.ask);
 
-    let request = TradeRequest::market("EURUSD", order_type::BUY, 0.1, tick.ask)
+    let request = TradeRequest::market("EURUSD", OrderType::Buy, 0.1, tick.ask)
         .deviation(20)
         .magic(42);
     let result = mt5.order_send(&request).await?;
-    println!("{}", mt5::retcode::name(result.retcode));
+    println!("{}", result.retcode);
     Ok(())
 }
 ```
@@ -117,9 +117,24 @@ All methods are on `Mt5`.
 `SymbolInfo` helpers: `normalize_volume`, `normalize_price`,
 `min_stop_distance`, `preferred_filling`, `supports_filling`.
 
-Enumerations are constant modules with MQL5 values: `order_type`,
-`trade_action`, `order_filling`, `order_time`, `position_type`, `deal_type`,
-`deal_entry`, `filling_mask`, `copy_ticks`, `retcode`.
+Enumerations are Rust enums that name themselves and convert both ways:
+`RetCode`, `OrderType`, `OrderFilling`, `OrderTime`, `OrderState`,
+`TradeAction`, `PositionType`, `DealType`, `DealEntry`, `SymbolTradeMode`,
+`AccountTradeMode`.
+
+```rust
+println!("{}", result.retcode);                  // DONE
+if result.retcode == RetCode::NoMoney { }
+match order.state {
+    OrderState::Filled => {}
+    other => println!("{other}"),
+}
+```
+
+A value the terminal sends that this crate has no name for becomes
+`Unknown(n)` and keeps its number, so a newer build cannot break a decode.
+`copy_ticks` and `filling_mask` stay constant modules: both are bitmasks,
+not enumerations.
 
 ### Example
 
@@ -127,7 +142,7 @@ Enumerations are constant modules with MQL5 values: `order_type`,
 let info = mt5.symbol_info("EURUSD").await?;
 let tick = mt5.symbol_tick("EURUSD").await?;
 
-let mut request = TradeRequest::market("EURUSD", order_type::BUY, 0.1, tick.ask)
+let mut request = TradeRequest::market("EURUSD", OrderType::Buy, 0.1, tick.ask)
     .sl(tick.ask - 0.0020)
     .tp(tick.ask + 0.0040)
     .deviation(20)
@@ -149,7 +164,7 @@ They are independent. `sl` and `tp` set one each, chain both to set both,
 and zero is how the protocol spells "no level".
 
 ```rust
-let stop_only = TradeRequest::market("EURUSD", order_type::BUY, 0.1, tick.ask)
+let stop_only = TradeRequest::market("EURUSD", OrderType::Buy, 0.1, tick.ask)
     .sl(tick.ask - 0.0020);
 ```
 
@@ -182,18 +197,19 @@ loop {
 - `ticks_from` and `ticks_range` take milliseconds (`time_msc`). Seconds are
   accepted but return data from hours earlier. A mark of 0 returns the newest
   ticks. The response includes the mark itself; `advance_ticks` removes it.
-- `order_check` reports success as retcode 0, not `DONE`. Use `is_ok()`.
+- `order_check` reports success as `RetCode::Ok`, not `Done`. Use `is_ok()`.
 - `order_send` is never retried. On transport failure it returns
   `Error::OutcomeUnknown` and drops the connection. Set `magic` on every
   order and search `orders()` and `history_orders()` before resending. Read
   calls do reconnect and retry.
-- Filling mode defaults to FOK. Brokers that do not support it reject every
-  order with `INVALID_FILL` (10030). Use `preferred_filling()`.
+- Filling mode defaults to `OrderFilling::Fok`. Brokers that do not support
+  it reject every order with `RetCode::InvalidFill`. Use
+  `preferred_filling()`.
 - Algo trading must be enabled in the terminal or the server returns
-  `CLIENT_DISABLES_AT` (10027). MT5 disables it on account change.
-- `SymbolInfo::trade_mode` of 0 means quotes only; orders return
-  `TRADE_DISABLED` (10017). 4 means full trading. Brokers commonly publish
-  `EURUSD` for display and `EURUSD+` or `EURUSD.s` for trading.
+  `RetCode::ClientDisablesAt`. MT5 disables it on account change.
+- `SymbolInfo::trade_mode` of `SymbolTradeMode::Disabled` means quotes only;
+  orders return `RetCode::TradeDisabled`. Brokers commonly publish `EURUSD`
+  for display and `EURUSD+` or `EURUSD.s` for trading.
 - A terminal accepts two concurrent pipe clients. The third blocks, then
   fails.
 - All timestamps are broker server time in Unix seconds. The terminal does

@@ -23,6 +23,11 @@ impl Writer {
         self.0.extend_from_slice(&v.to_le_bytes());
         self
     }
+    /// A little-endian `i32`, the width MQL5 gives an enumeration.
+    pub fn i32(mut self, v: i32) -> Self {
+        self.0.extend_from_slice(&v.to_le_bytes());
+        self
+    }
     /// A little-endian `i64`.
     pub fn i64(mut self, v: i64) -> Self {
         self.0.extend_from_slice(&v.to_le_bytes());

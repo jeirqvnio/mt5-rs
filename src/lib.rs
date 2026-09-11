@@ -6,20 +6,20 @@
 //! mt5.login(1_000_000, "password", "Broker-Demo").await?;
 //! let tick = mt5.symbol_tick("EURUSD").await?;
 //! let symbol = mt5.symbol_info("EURUSD").await?;
-//! let mut request = mt5::TradeRequest::market("EURUSD", mt5::order_type::BUY, 0.1, tick.ask)
+//! let mut request = mt5::TradeRequest::market("EURUSD", mt5::OrderType::Buy, 0.1, tick.ask)
 //!     .deviation(20)
 //!     .magic(42);
 //! if let Some(mode) = symbol.preferred_filling() {
 //!     request = request.filling(mode);
 //! }
 //! let result = mt5.order_send(&request).await?;
-//! println!("{} {}", mt5::retcode::name(result.retcode), result.comment);
+//! println!("{} {}", result.retcode, result.comment);
 //! # Ok(())
 //! # }
 //! ```
 //!
 //! MetaQuotes does not document this protocol; the layouts were reconstructed
-//! by observation against builds 5836–6140. Every read is bounds-checked and
+//! by observation against builds 5836 to 6182. Every read is bounds-checked and
 //! must consume its record exactly, so a build that moves a field fails by
 //! name instead of returning a plausible number. The trade request is
 //! size-checked before it leaves, `order_check` exercises it without reaching

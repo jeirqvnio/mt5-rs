@@ -11,7 +11,7 @@ const TERMINAL_STRINGS: [usize; 6] = [41, 561, 1081, 1601, 2121, 2641];
 pub fn account_info(buf: &[u8]) -> Result<AccountInfo> {
     single(buf, "account_info", |c| {
         fields!(c, "account", {
-            login: i64, trade_mode: i32, leverage: i32, limit_orders: i32, margin_so_mode: i32,
+            login: i64, trade_mode: enum_i32, leverage: i32, limit_orders: i32, margin_so_mode: i32,
             trade_allowed: bool, trade_expert: bool, margin_mode: i32, currency_digits: i32,
             fifo_close: bool, balance: f64, credit: f64, profit: f64, equity: f64, margin: f64,
             margin_free: f64, margin_level: f64, margin_so_call: f64, margin_so_so: f64,

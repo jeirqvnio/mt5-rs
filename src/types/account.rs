@@ -1,11 +1,21 @@
 //! The terminal and the account it holds.
 
+wire_enum! {
+    /// `ACCOUNT_TRADE_MODE`: what kind of account this is.
+    AccountTradeMode: i32 {
+        Demo = 0, "DEMO";
+        Contest = 1, "CONTEST";
+        /// Real money.
+        Real = 2, "REAL";
+    }
+}
+
 /// The logged-in trading account, as `account_info` reports it. Money
 /// figures are in the account currency.
 #[derive(Debug, Clone, Default)]
 pub struct AccountInfo {
     pub login: i64,
-    pub trade_mode: i32,
+    pub trade_mode: AccountTradeMode,
     pub leverage: i32,
     pub limit_orders: i32,
     pub margin_so_mode: i32,

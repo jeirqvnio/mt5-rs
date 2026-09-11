@@ -13,8 +13,8 @@ const DEAL_MIN: usize = 300;
 
 fn position(c: &mut Cursor) -> Result<Position> {
     fields!(c, "position", {
-        ticket: u64, time: i64, time_msc: i64, time_update: i64, time_update_msc: i64, kind: i32,
-        magic: u64, identifier: u64, reason: i32, volume: f64, price_open: f64, sl: f64, tp: f64,
+        ticket: u64, time: i64, time_msc: i64, time_update: i64, time_update_msc: i64,
+        kind: enum_i32, magic: u64, identifier: u64, reason: i32, volume: f64, price_open: f64, sl: f64, tp: f64,
         price_current: f64, swap: f64,
         // Eight bytes the Python API does not expose; reads zero intraday.
         _unknown: skip(8),
@@ -55,7 +55,8 @@ pub fn position_one(buf: &[u8]) -> Result<Position> {
 fn order(c: &mut Cursor) -> Result<Order> {
     fields!(c, "order", {
         ticket: u64, time_setup: i64, time_setup_msc: i64, time_done: i64, time_done_msc: i64,
-        time_expiration: i64, kind: i32, type_time: i32, type_filling: i32, state: i32, magic: u64,
+        time_expiration: i64, kind: enum_i32, type_time: enum_i32, type_filling: enum_i32,
+        state: enum_i32, magic: u64,
         position_id: u64, position_by_id: u64, reason: i32, volume_initial: f64,
         volume_current: f64, price_open: f64, price_current: f64, sl: f64, tp: f64,
         price_stoplimit: f64, symbol: fixed_string(SLOT_SYMBOL), comment: fixed_string(SLOT_COMMENT),
@@ -99,7 +100,8 @@ pub fn order_one(buf: &[u8]) -> Result<Order> {
 
 fn deal(c: &mut Cursor) -> Result<Deal> {
     fields!(c, "deal", {
-        ticket: u64, order: u64, time: i64, time_msc: i64, kind: i32, entry: i32, magic: u64,
+        ticket: u64, order: u64, time: i64, time_msc: i64, kind: enum_i32, entry: enum_i32,
+        magic: u64,
         position_id: u64, reason: i32, volume: f64, price: f64, commission: f64, swap: f64,
         profit: f64, fee: f64, symbol: fixed_string(SLOT_SYMBOL), comment: fixed_string(SLOT_COMMENT),
         external_id: fixed_string(SLOT_EXTERNAL_ID),

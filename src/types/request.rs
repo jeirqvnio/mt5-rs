@@ -1,12 +1,12 @@
 //! `MqlTradeRequest`: what an order asks the server to do.
 
-use crate::types::{trade_action, Order, Position};
+use crate::types::{Order, OrderFilling, OrderTime, OrderType, Position, TradeAction};
 
 /// Zero is the terminal's own "unset" for every field, so there are no
 /// options: leave what you do not need at its default.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct TradeRequest {
-    pub action: u32,
+    pub action: TradeAction,
     pub magic: u64,
     pub order: u64,
     pub symbol: String,
@@ -16,9 +16,9 @@ pub struct TradeRequest {
     pub sl: f64,
     pub tp: f64,
     pub deviation: u64,
-    pub order_type: u32,
-    pub type_filling: u32,
-    pub type_time: u32,
+    pub order_type: OrderType,
+    pub type_filling: OrderFilling,
+    pub type_time: OrderTime,
     pub expiration: i64,
     pub comment: String,
     pub position: u64,
@@ -27,9 +27,9 @@ pub struct TradeRequest {
 
 impl TradeRequest {
     /// A market order at `price` (the ask for a buy, the bid for a sell).
-    pub fn market(symbol: &str, order_type: u32, volume: f64, price: f64) -> Self {
+    pub fn market(symbol: &str, order_type: OrderType, volume: f64, price: f64) -> Self {
         TradeRequest {
-            action: trade_action::DEAL,
+            action: TradeAction::Deal,
             symbol: symbol.to_string(),
             volume,
             order_type,
@@ -39,9 +39,9 @@ impl TradeRequest {
     }
 
     /// A pending order resting at `price`.
-    pub fn pending(symbol: &str, order_type: u32, volume: f64, price: f64) -> Self {
+    pub fn pending(symbol: &str, order_type: OrderType, volume: f64, price: f64) -> Self {
         TradeRequest {
-            action: trade_action::PENDING,
+            action: TradeAction::Pending,
             ..Self::market(symbol, order_type, volume, price)
         }
     }
@@ -60,7 +60,7 @@ impl TradeRequest {
     /// ticket and its stop and target.
     pub fn close_part(position: &Position, price: f64, volume: f64) -> Self {
         TradeRequest {
-            action: trade_action::DEAL,
+            action: TradeAction::Deal,
             symbol: position.symbol.clone(),
             volume: volume.clamp(0.0, position.volume),
             order_type: position.closing_order_type(),
@@ -78,7 +78,7 @@ impl TradeRequest {
     /// [`TradeRequest::clear_tp`] rather than leaving it out.
     pub fn protect(position: &Position) -> Self {
         TradeRequest {
-            action: trade_action::SLTP,
+            action: TradeAction::Sltp,
             symbol: position.symbol.clone(),
             position: position.ticket,
             sl: position.sl,
@@ -98,15 +98,15 @@ impl TradeRequest {
     /// different kind of order.
     pub fn modify(order: &Order, price: f64) -> Self {
         TradeRequest {
-            action: trade_action::MODIFY,
+            action: TradeAction::Modify,
             symbol: order.symbol.clone(),
             order: order.ticket,
-            order_type: order.kind as u32,
+            order_type: order.kind,
             price,
             sl: order.sl,
             tp: order.tp,
             stoplimit: order.price_stoplimit,
-            type_time: order.type_time as u32,
+            type_time: order.type_time,
             expiration: order.time_expiration,
             ..Default::default()
         }
@@ -115,7 +115,7 @@ impl TradeRequest {
     /// Cancel a pending order.
     pub fn remove(order: u64) -> Self {
         TradeRequest {
-            action: trade_action::REMOVE,
+            action: TradeAction::Remove,
             order,
             ..Default::default()
         }
@@ -167,7 +167,7 @@ impl TradeRequest {
     }
     /// Set the filling mode. Not optional in practice — see
     /// [`crate::SymbolInfo::preferred_filling`].
-    pub fn filling(mut self, mode: u32) -> Self {
+    pub fn filling(mut self, mode: OrderFilling) -> Self {
         self.type_filling = mode;
         self
     }
@@ -182,13 +182,13 @@ impl TradeRequest {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{order_type, position_type};
+    use crate::types::PositionType;
 
     fn long() -> Position {
         Position {
             ticket: 11,
             symbol: "EURUSD".to_string(),
-            kind: position_type::BUY,
+            kind: PositionType::Buy,
             volume: 1.0,
             sl: 1.0900,
             tp: 1.1200,
@@ -206,7 +206,7 @@ mod tests {
         assert_eq!(full.volume, 1.0);
         assert_eq!(
             full.order_type,
-            order_type::SELL,
+            OrderType::Sell,
             "a long is closed by selling"
         );
         assert_eq!(full.position, 11);
@@ -235,7 +235,7 @@ mod tests {
 
     #[test]
     fn a_stop_and_a_target_are_independent_of_each_other() {
-        let entry = || TradeRequest::market("EURUSD", order_type::BUY, 0.1, 1.1000);
+        let entry = || TradeRequest::market("EURUSD", OrderType::Buy, 0.1, 1.1000);
         let stop_only = entry().sl(1.0900);
         assert_eq!(stop_only.sl, 1.0900);
         assert_eq!(stop_only.tp, 0.0, "no target is zero, not a requirement");
@@ -254,11 +254,11 @@ mod tests {
         let resting = Order {
             ticket: 42,
             symbol: "EURUSD".to_string(),
-            kind: order_type::BUY_LIMIT as i32,
+            kind: OrderType::BuyLimit,
             price_open: 1.0800,
             sl: 1.0700,
             tp: 1.0950,
-            type_time: 2,
+            type_time: OrderTime::Specified,
             time_expiration: 1_700_000_000,
             ..Default::default()
         };
@@ -267,11 +267,11 @@ mod tests {
         assert_eq!(moved.order, 42);
         assert_eq!(
             moved.order_type,
-            order_type::BUY_LIMIT,
+            OrderType::BuyLimit,
             "the kind never changes"
         );
         assert_eq!((moved.sl, moved.tp), (1.0700, 1.0950));
-        assert_eq!(moved.type_time, 2);
+        assert_eq!(moved.type_time, OrderTime::Specified);
         assert_eq!(moved.expiration, 1_700_000_000);
     }
 }

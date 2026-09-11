@@ -1,10 +1,30 @@
 //! Contract terms, and the arithmetic that keeps an order on the contract's
 //! own grid.
 
-use crate::types::{filling_mask, order_filling};
+use crate::types::{filling_mask, OrderFilling};
 
 /// How close to an exact grid multiple counts as on it.
 const GRID_TOLERANCE: f64 = 1e-9;
+
+wire_enum! {
+    /// `SYMBOL_TRADE_MODE`: what the broker allows on this contract.
+    ///
+    /// Worth checking before an order: brokers commonly publish one symbol
+    /// for display and another, differently named, for trading. A quote on a
+    /// [`SymbolTradeMode::Disabled`] contract looks perfectly normal and
+    /// every order against it comes back
+    /// [`crate::RetCode::TradeDisabled`].
+    SymbolTradeMode: i32 {
+        /// Quotes only. Orders are refused.
+        Disabled = 0, "DISABLED";
+        /// Closing an existing position only.
+        LongOnly = 1, "LONGONLY";
+        ShortOnly = 2, "SHORTONLY";
+        CloseOnly = 3, "CLOSEONLY";
+        /// No restriction.
+        Full = 4, "FULL";
+    }
+}
 
 /// The terminal sends ~90 fields; these are the ones that bear on quoting,
 /// sizing and order construction.
@@ -20,7 +40,7 @@ pub struct SymbolInfo {
     pub spread_float: bool,
     pub ticks_bookdepth: i32,
     pub trade_calc_mode: i32,
-    pub trade_mode: i32,
+    pub trade_mode: SymbolTradeMode,
     pub start_time: i64,
     pub expiration_time: i64,
     /// Minimum distance of SL/TP from price, in points.
@@ -71,11 +91,11 @@ impl SymbolInfo {
     /// Whether the contract advertises this filling mode. `RETURN` never
     /// appears in the mask, so it always reads false here even where the
     /// broker accepts it for pending orders.
-    pub fn supports_filling(&self, mode: u32) -> bool {
+    pub fn supports_filling(&self, mode: OrderFilling) -> bool {
         let bit = match mode {
-            order_filling::FOK => filling_mask::FOK,
-            order_filling::IOC => filling_mask::IOC,
-            order_filling::BOC => filling_mask::BOC,
+            OrderFilling::Fok => filling_mask::FOK,
+            OrderFilling::Ioc => filling_mask::IOC,
+            OrderFilling::Boc => filling_mask::BOC,
             // RETURN is never advertised in the mask.
             _ => return false,
         };
@@ -86,10 +106,10 @@ impl SymbolInfo {
     ///
     /// Not optional in practice: the default is FOK, and a broker that does
     /// not offer it answers `INVALID_FILL` before looking at anything else.
-    pub fn preferred_filling(&self) -> Option<u32> {
-        [order_filling::FOK, order_filling::IOC, order_filling::BOC]
+    pub fn preferred_filling(&self) -> Option<OrderFilling> {
+        [OrderFilling::Fok, OrderFilling::Ioc, OrderFilling::Boc]
             .into_iter()
-            .find(|&m| self.supports_filling(m))
+            .find(|&mode| self.supports_filling(mode))
     }
 
     /// Cap and snap a volume onto the lot grid, rounding down. `None` when it
@@ -187,7 +207,7 @@ mod tests {
         let s = symbol();
         assert_eq!(s.normalize_price(1.234567), 1.23457);
         assert_eq!(s.min_stop_distance(), 0.0001);
-        assert_eq!(s.preferred_filling(), Some(order_filling::IOC));
+        assert_eq!(s.preferred_filling(), Some(OrderFilling::Ioc));
         assert_eq!(SymbolInfo::default().preferred_filling(), None);
     }
 }
