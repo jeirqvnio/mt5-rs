@@ -27,7 +27,8 @@ async fn main() -> mt5::Result<()> {
         ),
     };
     let sym = std::env::var("MT5_SYMBOL").unwrap_or_else(|_| "EURUSD".into());
-    let mt5 = Mt5::connect(config).await?;
+    let mt5 = Mt5::new(config);
+    mt5.connect().await?;
     report("build", Ok(mt5.build().await));
     report("version", mt5.version().await);
     report(

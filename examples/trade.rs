@@ -10,7 +10,8 @@ async fn main() -> mt5::Result<()> {
         &std::env::var("MT5_RELAY_ADDR").unwrap_or_else(|_| "127.0.0.1:18813".into()),
         &std::env::var("MT5_BRIDGE_TOKEN").unwrap_or_default(),
     );
-    let mt5 = Mt5::connect(config).await?;
+    let mt5 = Mt5::new(config);
+    mt5.connect().await?;
     let ti = mt5.terminal_info().await?;
     let a = mt5.account_info().await?;
     println!(

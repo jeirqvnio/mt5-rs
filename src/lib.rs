@@ -36,7 +36,7 @@ pub mod error;
 pub mod types;
 pub mod wire;
 
-pub use client::{Config, Mt5};
+pub use client::{Config, Credentials, Mt5};
 pub use error::{Error, Result};
 pub use types::*;
 pub use wire::{pipe_name_for, Endpoint};

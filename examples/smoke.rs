@@ -13,7 +13,8 @@ async fn main() -> mt5::Result<()> {
         ),
     };
     let symbol = std::env::var("MT5_SYMBOL").unwrap_or_else(|_| "EURUSD".into());
-    let mt5 = Mt5::connect(config).await?;
+    let mt5 = Mt5::new(config);
+    mt5.connect().await?;
 
     let version = mt5.version().await?;
     let terminal = mt5.terminal_info().await?;
@@ -22,6 +23,10 @@ async fn main() -> mt5::Result<()> {
         version.build, version.released, terminal.connected, terminal.trade_allowed
     );
     let account = mt5.account_info().await?;
+    if account.login == 0 {
+        println!("no account logged in; set one with Config::account or Mt5::login");
+        return Ok(());
+    }
     println!(
         "account {} {} {} {}",
         account.login, account.server, account.balance, account.currency

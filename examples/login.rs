@@ -20,7 +20,8 @@ async fn main() -> mt5::Result<()> {
     let server = std::env::var("MT5_SERVER").unwrap_or_default();
     let sym = std::env::var("MT5_SYMBOL").unwrap_or_else(|_| "EURUSD".into());
 
-    let mt5 = Mt5::connect(config).await?;
+    let mt5 = Mt5::new(config);
+    mt5.connect().await?;
     println!(
         "before: {:?}",
         mt5.account_info().await.map(|a| (a.login, a.server))?

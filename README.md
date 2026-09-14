@@ -81,7 +81,36 @@ Relay configuration:
 
 The port gives full trading access to the account. Bind it to localhost.
 
+To run the terminal itself in a container, on amd64 or arm64, see
+[`docker/`](docker/README.md).
+
+### Creating and connecting
+
+`Mt5::relay` and `Mt5::terminal` connect immediately. `Mt5::new` builds a
+client without touching the network, for clients kept in a `Vec` or created
+before the terminal is up:
+
+```rust
+let mt5 = Mt5::new(Config::relay("127.0.0.1:18813", &token));
+mt5.connect().await?;
+```
+
+`connect` is idempotent: it opens a session only when there is none. A call
+that sees the connection break drops the session, so `connect` after an error
+reopens it. `Mt5` is `Send + Sync`.
+
 ## Logging in
+
+Put the account in the configuration to log it in on every connection,
+including the reconnects reads make on their own:
+
+```rust
+let config = Config::relay("127.0.0.1:18813", &token)
+    .account(1_000_000, "password", "Broker-Demo")
+    .connect_timeout(Duration::from_secs(30));
+```
+
+Or switch the current session once:
 
 ```rust
 mt5.login(1_000_000, "password", "Broker-Demo").await?;
@@ -89,8 +118,16 @@ mt5.login(1_000_000, "password", "Broker-Demo").await?;
 
 The protocol returns no verdict for a login. A wrong password is
 acknowledged like a correct one and the terminal then fails to connect.
-`login` polls `terminal_info().connected` and returns `Error::LoginFailed`
-on timeout.
+Both paths poll `terminal_info().connected` and return `Error::LoginFailed`
+on timeout. Logging in to the account the terminal already holds returns in
+milliseconds.
+
+With `Config::account` set, a reconnect while the terminal cannot reach the
+broker waits `connect_timeout` and fails, so reads fail too until the broker
+is back.
+
+`Debug` output of `Config` and `Endpoint` redacts the password and the relay
+token.
 
 ## API
 

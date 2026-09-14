@@ -27,12 +27,26 @@ const PIPE_BUSY_WAIT: Duration = Duration::from_secs(5);
 const PIPE_BUSY_POLL: Duration = Duration::from_millis(50);
 
 /// Where a terminal can be reached.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum Endpoint {
     /// The terminal's named pipe. Windows only — see [`pipe_name_for`].
     Pipe(String),
     /// `host:port` of an `mt5-relay` beside the terminal, and its shared secret.
     Relay { addr: String, token: String },
+}
+
+/// Redacted: the relay token grants trading access and must not reach a log.
+impl std::fmt::Debug for Endpoint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Endpoint::Pipe(name) => f.debug_tuple("Pipe").field(name).finish(),
+            Endpoint::Relay { addr, .. } => f
+                .debug_struct("Relay")
+                .field("addr", addr)
+                .field("token", &"<redacted>")
+                .finish(),
+        }
+    }
 }
 
 impl std::fmt::Display for Endpoint {

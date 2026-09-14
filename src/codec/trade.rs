@@ -95,26 +95,96 @@ pub fn check_result(buf: &[u8]) -> Result<TradeCheckResult> {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
-    use crate::types::{OrderType, TradeAction};
+    use crate::types::{OrderFilling, OrderTime, OrderType, TradeAction};
 
+    /// Every field of a fully populated request, read back at the offset the
+    /// terminal expects it. This pins the layout: a changed width, a reordered
+    /// field or a resized slot moves something here and fails the test rather
+    /// than sending a different order.
     #[test]
-    fn the_request_is_232_bytes_with_fields_where_the_terminal_expects_them() {
-        let r = TradeRequest::market("EURUSD", OrderType::Buy, 0.1, 1.2345)
-            .magic(777)
-            .deviation(20)
-            .comment(&"x".repeat(500));
-        let body = trade_request(&r).unwrap();
+    fn the_request_is_232_bytes_with_every_field_where_the_terminal_expects_it() {
+        let request = TradeRequest {
+            action: TradeAction::Pending,
+            magic: 777,
+            order: 88,
+            symbol: "EURUSD".to_string(),
+            volume: 0.1,
+            price: 1.2345,
+            stoplimit: 1.2000,
+            sl: 1.1000,
+            tp: 1.3000,
+            deviation: 20,
+            order_type: OrderType::SellStopLimit,
+            type_filling: OrderFilling::Boc,
+            type_time: OrderTime::SpecifiedDay,
+            expiration: 1_700_000_000,
+            comment: "note".to_string(),
+            position: 99,
+            position_by: 100,
+        };
+        let body = trade_request(&request).unwrap();
         assert_eq!(body.len(), REQUEST_BYTES);
+
         let mut c = Cursor::new(&body);
-        assert_eq!(c.i32("action").unwrap(), TradeAction::Deal.code());
+        assert_eq!(c.i32("action").unwrap(), TradeAction::Pending.code());
         assert_eq!(c.u64("magic").unwrap(), 777);
-        c.skip(8, "order").unwrap();
-        assert_eq!(c.fixed_string(64, "symbol").unwrap(), "EURUSD");
+        assert_eq!(c.u64("order").unwrap(), 88);
+        assert_eq!(c.fixed_string(SLOT_SYMBOL, "symbol").unwrap(), "EURUSD");
         assert_eq!(c.f64("volume").unwrap(), 0.1);
         assert_eq!(c.f64("price").unwrap(), 1.2345);
-        c.skip(24, "stoplimit sl tp").unwrap();
+        assert_eq!(c.f64("stoplimit").unwrap(), 1.2000);
+        assert_eq!(c.f64("sl").unwrap(), 1.1000);
+        assert_eq!(c.f64("tp").unwrap(), 1.3000);
         assert_eq!(c.u64("deviation").unwrap(), 20);
-        assert_eq!(c.i32("type").unwrap(), OrderType::Buy.code());
+        assert_eq!(c.i32("type").unwrap(), OrderType::SellStopLimit.code());
+        assert_eq!(c.i32("filling").unwrap(), OrderFilling::Boc.code());
+        assert_eq!(c.i32("time").unwrap(), OrderTime::SpecifiedDay.code());
+        assert_eq!(c.i64("expiration").unwrap(), 1_700_000_000);
+        assert_eq!(c.fixed_string(SLOT_COMMENT, "comment").unwrap(), "note");
+        assert_eq!(c.u64("position").unwrap(), 99);
+        assert_eq!(c.u64("position_by").unwrap(), 100);
+        c.expect_consumed("trade request").unwrap();
+    }
+
+    /// Enumerations travel as `i32` because that is what MQL5 declares them,
+    /// but they used to be written as `u32`. For every value this crate can
+    /// send, the two produce the same bytes, which is why the change was
+    /// invisible to the terminal. The test says so rather than leaving it to
+    /// be reasoned about.
+    #[test]
+    fn the_signed_and_unsigned_encodings_agree_for_every_value_we_send() {
+        let sendable = [
+            TradeAction::Deal.code(),
+            TradeAction::Pending.code(),
+            TradeAction::Sltp.code(),
+            TradeAction::Modify.code(),
+            TradeAction::Remove.code(),
+            TradeAction::CloseBy.code(),
+            OrderType::Buy.code(),
+            OrderType::SellStopLimit.code(),
+            OrderType::CloseBy.code(),
+            OrderFilling::Fok.code(),
+            OrderFilling::Boc.code(),
+            OrderTime::Gtc.code(),
+            OrderTime::SpecifiedDay.code(),
+        ];
+        for value in sendable {
+            assert!(value >= 0, "{value} would differ between the two widths");
+            assert_eq!(
+                value.to_le_bytes(),
+                (value as u32).to_le_bytes(),
+                "value {value} encodes differently as i32 and u32"
+            );
+        }
+    }
+
+    /// A comment too long for its slot must not push the fields after it.
+    #[test]
+    fn an_over_long_comment_does_not_move_the_tail() {
+        let request =
+            TradeRequest::market("EURUSD", OrderType::Buy, 0.1, 1.0).comment(&"x".repeat(500));
+        let body = trade_request(&request).unwrap();
+        assert_eq!(body.len(), REQUEST_BYTES);
     }
 
     #[test]

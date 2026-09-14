@@ -1,0 +1,45 @@
+# One MetaTrader 5 terminal with mt5-relay in front of it.
+#
+#   echo "MT5_BRIDGE_TOKEN=$(openssl rand -hex 16)" > docker/.env
+#   docker compose -f docker/compose.example.yaml up -d --build
+#
+# The port is published on 127.0.0.1 only. Whoever reaches it can trade.
+#
+# One terminal holds one account. For a second account copy the service and
+# give it another port and another volume.
+#
+# Logging in is done by the client over IPC (`Config::account` or
+# `Mt5::login`), not here: a terminal started with a `/config:` file does not
+# open its pipe.
+
+services:
+  mt5:
+    image: ${MT5_IMAGE:-mt5:relay}
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    command: ["relay"]
+    # Wine needs ptrace and unrestricted syscalls for exception handling.
+    # Without them the installer exits with code 29 and installs nothing.
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - seccomp:unconfined
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 30s
+    ports:
+      - "127.0.0.1:${MT5_HOST_PORT:-18813}:18813"
+    environment:
+      MT5_BRIDGE_TOKEN: ${MT5_BRIDGE_TOKEN:?set MT5_BRIDGE_TOKEN in docker/.env}
+    volumes:
+      - wine:/wine
+    # About 620 MB in use with one symbol in Market Watch, nearly all of it
+    # the terminal itself.
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+
+volumes:
+  wine:
